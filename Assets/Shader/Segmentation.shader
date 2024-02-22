@@ -27,13 +27,13 @@ Shader "Unlit/Segmentation"
             {
                 float2 uv : TEXCOORD0;
                 float4 vertex : SV_POSITION;
-				float4 screenPos : TEXCOORD1;
+				float3 worldPos : TEXCOORD1;
             };
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
 
-			#define _TileSize 30.0
+			#define _TileSize 1.0
 
 			float rand3dTo1d(float3 value, float3 seed = float3(13.233,8.128,11.234))
 			{
@@ -58,7 +58,7 @@ Shader "Unlit/Segmentation"
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
-				o.screenPos = ComputeScreenPos(o.vertex);
+				o.worldPos = mul(unity_ObjectToWorld, float4(v.vertex)).xyz;
                 return o;
             }
 
@@ -66,9 +66,8 @@ Shader "Unlit/Segmentation"
             {
                 // sample the texture
                 float3 col;
-				float4 screenPos = i.screenPos / i.screenPos.w;
-				float4 fracScreenPos = frac(screenPos * _TileSize);
-				col = rand3dTo3d(floor(screenPos * _TileSize));
+				float3 fracWorldPos = frac(i.worldPos * _TileSize);
+				col = rand3dTo3d(floor(i.worldPos * _TileSize));
                 return float4(float3(col), 1.0);
             }
             ENDCG
