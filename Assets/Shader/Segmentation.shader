@@ -34,7 +34,7 @@ Shader "Unlit/Segmentation"
             float4 _MainTex_ST;
 
 			#define _TileSize 0.9
-			#define _BorderSize 0.45
+			#define _BorderSize 0.49
 
 			float rand3dTo1d(float3 value, float3 seed = float3(13.233,8.128, 1.343))
 			{
@@ -68,10 +68,10 @@ Shader "Unlit/Segmentation"
             fixed4 frag (v2f i) : SV_Target
             {
                 // sample the texture
-				float2 fracWorldPos = frac(i.worldPos * _TileSize);
+				float3 fracWorldPos = frac(i.worldPos * _TileSize);
 				float3 col = rand3dTo3d(floor(i.worldPos * _TileSize));
 
-				col.xyz = (col * step(abs(fracWorldPos.x - 0.5),_BorderSize) * step(abs(fracWorldPos.y - 0.5),_BorderSize)).xyz;
+				col.xyz = (col * step(abs(fracWorldPos.x - 0.5),_BorderSize) * step(abs(fracWorldPos.y - 0.5),_BorderSize)* step(abs(fracWorldPos.z - 0.5),_BorderSize)).xyz;
 
                 return float4(col, 1.0);
             }
