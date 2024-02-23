@@ -68,12 +68,69 @@ Shader "Unlit/Segmentation"
             fixed4 frag (v2f i) : SV_Target
             {
                 // sample the texture
-				float3 fracWorldPos = frac(i.worldPos * _TileSize);
-				float3 col = rand3dTo3d(floor(i.worldPos * _TileSize));
 
-				col.xyz = (col * step(abs(fracWorldPos.x - 0.5),_BorderSize) * step(abs(fracWorldPos.y - 0.5),_BorderSize)* step(abs(fracWorldPos.z - 0.5),_BorderSize)).xyz;
+				float3 value = i.worldPos / _TileSize;
+				float3 cell = floor(value);
 
-                return float4(col, 1.0);
+				float3 closestCell;
+				float3 toClosestCell;
+				float distToClosestCell = 1000.0;
+				[unroll]
+				for(int x = -1; x < 2; x++)
+				{
+					[unroll]
+					for(int y = -1; y < 2; y++)
+					{
+						[unroll]
+						for(int z = -1; z < 2; z++)
+						{
+							float3 neighbourCell = cell + float3(x,y,z);
+							float3 neighbourCellPos = neighbourCell + rand3dTo3d(neighbourCell);
+							float3 toNeighbourCell = neighbourCellPos - value;
+							float neighbourCellDist = length(toNeighbourCell);
+							if(neighbourCellDist < distToClosestCell)
+							{
+								closestCell = neighbourCell;
+								distToClosestCell = neighbourCellDist;
+								toClosestCell = toNeighbourCell;
+							}
+
+						}
+					}
+				}
+
+				float minEdgeDistance = 100.0;
+				[unroll]
+				for(int x1 = -1; x1 < 2; x1++)
+				{
+					[unroll]
+					for(int y1 = -1; y1 < 2; y1++)
+					{
+						[unroll]
+						for(int z1 = -1; z1 < 2; z1++)
+						{
+							float3 neighbourCell = cell + float3(x1,y1,z1);
+							float3 neighbourCellPos = neighbourCell + rand3dTo3d(neighbourCell);
+							float3 toNeighbourCell = neighbourCellPos - value;
+
+							float3 distToCurrentCell = abs(closestCell - neighbourCell);
+							bool isClosestCell = distToCurrentCell.x + distToCurrentCell.y + distToCurrentCell.z < 0.1;
+							if(!isClosestCell)
+							{
+								float3 toCenter = (toClosestCell + toNeighbourCell) * 0.5;
+								float3 cellDif = normalize( toNeighbourCell - toClosestCell);
+								float distToEdge = dot(toCenter, cellDif );
+								minEdgeDistance = min(minEdgeDistance, distToEdge);
+							}
+						}
+					}
+				}
+
+				float3 color = rand3dTo3d(closestCell);
+				float isBorder = step(minEdgeDistance, 0.02);
+				float3 finalColor = lerp(color, float3(0,0,0), isBorder);
+
+                return float4(finalColor, 1.0);
             }
             ENDCG
         }
