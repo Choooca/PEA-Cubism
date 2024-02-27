@@ -27,13 +27,13 @@ Shader "Unlit/Segmentation"
             {
                 float2 uv : TEXCOORD0;
                 float4 vertex : SV_POSITION;
-				
+				float4 worldPos : TEXCOORD1;
             };
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
 
-			#define _TileSize 5.0
+			#define _TileSize 0.9
 			#define _BorderSize 0.49
 
 			float rand3dTo1d(float3 value, float3 seed = float3(13.233,8.128, 1.343))
@@ -60,13 +60,21 @@ Shader "Unlit/Segmentation"
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
 
-				float4 worldPos = mul(unity_ObjectToWorld, v.vertex);
+				o.worldPos = mul(unity_ObjectToWorld, v.vertex);
 
-				float3 value = worldPos / _TileSize;
+                return o;
+            }
+
+            fixed4 frag (v2f i) : SV_Target
+            {
+                // sample the texture
+
+				float3 value = i.worldPos / _TileSize;
 				float3 cell = floor(value);
 
 				float3 closestCell;
-				float distToClosestCell = 1000;
+				float3 toClosestCell;
+				float distToClosestCell = 1000.0;
 				[unroll]
 				for(int x = -1; x < 2; x++)
 				{
@@ -84,22 +92,45 @@ Shader "Unlit/Segmentation"
 							{
 								closestCell = neighbourCell;
 								distToClosestCell = neighbourCellDist;
+								toClosestCell = toNeighbourCell;
 							}
 
 						}
 					}
 				}
 
-                o.uv = TRANSFORM_TEX(v.uv, _MainTex);
+				float minEdgeDistance = 100.0;
+				[unroll]
+				for(int x1 = -1; x1 < 2; x1++)
+				{
+					[unroll]
+					for(int y1 = -1; y1 < 2; y1++)
+					{
+						[unroll]
+						for(int z1 = -1; z1 < 2; z1++)
+						{
+							float3 neighbourCell = cell + float3(x1,y1,z1);
+							float3 neighbourCellPos = neighbourCell + rand3dTo3d(neighbourCell);
+							float3 toNeighbourCell = neighbourCellPos - value;
 
-                return o;
-            }
+							float3 distToCurrentCell = abs(closestCell - neighbourCell);
+							bool isClosestCell = distToCurrentCell.x + distToCurrentCell.y + distToCurrentCell.z < 0.1;
+							if(!isClosestCell)
+							{
+								float3 toCenter = (toClosestCell + toNeighbourCell) * 0.5;
+								float3 cellDif = normalize( toNeighbourCell - toClosestCell);
+								float distToEdge = dot(toCenter, cellDif );
+								minEdgeDistance = min(minEdgeDistance, distToEdge);
+							}
+						}
+					}
+				}
 
-            fixed4 frag (v2f i) : SV_Target
-            {
-				fixed4 col = tex2D(_MainTex, i.uv);
-                // sample the texture
-                return col;
+				float3 color = rand3dTo3d(closestCell);
+				float isBorder = step(minEdgeDistance, 0.02);
+				float3 finalColor = lerp(color, float3(0,0,0), isBorder);
+
+                return float4(finalColor, 1.0);
             }
             ENDCG
         }
